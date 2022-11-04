@@ -1,5 +1,5 @@
 //------------------------------------------------------------------------------
-// LAGraph/experimental/benchmark/helloworld2_demo.c: a simple demo
+// LAGraph/experimental/benchmark/multisourcebfs_demo.c: a simple demo
 //------------------------------------------------------------------------------
 
 // LAGraph, (c) 2022 by The LAGraph Contributors, All Rights Reserved.
@@ -7,13 +7,14 @@
 // See additional acknowledgments in the LICENSE file,
 // or contact permission@sei.cmu.edu for the full terms.
 
-// Contributed by Timothy A Davis, Texas A&M University
+// Contributed by Alexandra Goff
 
 //------------------------------------------------------------------------------
 
 // This main program is a simple driver for testing and benchmarking the
-// LAGraph_HelloWorld "algorithm", in experimental/algorithm.  To use it,
-// compile LAGraph while in the build folder with these commands:
+// LAGraph_MultiSourceBFS algorithm, in experimental/algorithmn based on 
+// helloworld2_demo.  To use it, compile LAGraph while in the build folder
+// with these commands:
 //
 //      cd LAGraph/build
 //      cmake ..
@@ -21,17 +22,9 @@
 //
 // Then run this demo with an input matrix.  For example:
 //
-//      ./experimental/benchmark/helloworld2_demo < ../data/west0067.mtx
-//      ./experimental/benchmark/helloworld2_demo < ../data/karate.mtx
+//      ./experimental/benchmark/multisourcebfs_demo < ../data/west0067.mtx
+//      ./experimental/benchmark/multisourcebfs_demo < ../data/karate.mtx
 //
-// If you create your own algorithm and want to mimic this main program, call
-// it write in experimental/benchmark/whatever_demo.c (with "_demo.c" as the
-// end of the filename), and the cmake will find it and compile it.
-
-// This main program only uses the user-callable methods in LAGraph.h and
-// LAGraphX.h.  See helloworld_demo.c for another example that relies on
-// internal methods defined in the src/benchmark and src/utility.
-
 #include "LAGraphX.h"
 
 // LAGRAPH_CATCH is required by LAGRAPH_TRY.  If an error occurs, this macro
@@ -40,6 +33,9 @@
 {                                               \
     GrB_free (&Y) ;                             \
     GrB_free (&A) ;                             \
+    GrB_free (&parent) ;                        \
+    GrB_free (&level) ;                         \
+    GrB_free (&SourceNodes) ;                   \
     LAGraph_Delete (&G, msg) ;                  \
     return (info) ;                             \
 }
@@ -57,6 +53,9 @@ int main (int argc, char **argv)
     char msg [LAGRAPH_MSG_LEN] ;        // for error messages from LAGraph
     LAGraph_Graph G = NULL ;
     GrB_Matrix Y = NULL, A = NULL ;
+    GrB_Matrix level = NULL ;
+    GrB_Matrix parent = NULL ;
+    GrB_Vector SourceNodes = NULL ;
 
     // start GraphBLAS and LAGraph
     LAGRAPH_TRY (LAGraph_Init (msg)) ;
@@ -75,18 +74,25 @@ int main (int argc, char **argv)
     LAGRAPH_TRY (LAGraph_Graph_Print (G, LAGraph_SHORT, stdout, msg)) ;
 
     //--------------------------------------------------------------------------
-    // try the LAGraph_HelloWorld "algorithm"
+    // try the LAGraph_MultiSourceBFS algorithm
     //--------------------------------------------------------------------------
 
+    printf ("\n==========================Set up for BFS\n") ;
+    // set up
+    GRB_TRY (GrB_Vector_new (&SourceNodes, GrB_INT32, 1)) ;
+    printf ("\n==========================Intermediate Print\n") ;
+    GRB_TRY (GrB_Vector_setElement (SourceNodes, 0, 0)) ; // currently just uses node 0 of the graph
+
+    printf ("\n==========================Running BFS\n") ;
     t = LAGraph_WallClockTime ( ) ;
-    LAGRAPH_TRY (LAGraph_HelloWorld (&Y, G, msg)) ;
+    LAGRAPH_TRY (LAGraph_MultiSourceBFS (&level, &parent, G, SourceNodes, msg)) ;
     t = LAGraph_WallClockTime ( ) - t ;
-    printf ("Time for LAGraph_HelloWorld: %g sec\n", t) ;
+    printf ("Time for LAGraph_MultiSourceBFS: %g sec\n", t) ;
 
     //--------------------------------------------------------------------------
     // check the results (make sure Y is a copy of G->A)
     //--------------------------------------------------------------------------
-
+/*
     bool isequal ;
     t = LAGraph_WallClockTime ( ) ;
     LAGRAPH_TRY (LAGraph_Matrix_IsEqual (&isequal, Y, G->A, msg)) ;
@@ -100,13 +106,15 @@ int main (int argc, char **argv)
     {
         printf ("Test failure!\n") ;
     }
-
+*/
     //--------------------------------------------------------------------------
     // print the results (Y is just a copy of G->A)
     //--------------------------------------------------------------------------
 
-    printf ("\n===============================The result matrix Y:\n") ;
-    LAGRAPH_TRY (LAGraph_Matrix_Print (Y, LAGraph_SHORT, stdout, msg)) ;
+    printf ("\n===============================The result matrix level:\n") ;
+    LAGRAPH_TRY (LAGraph_Matrix_Print (level, LAGraph_SHORT, stdout, msg)) ;
+    printf ("\n===============================The result matrix parent:\n") ;
+    LAGRAPH_TRY (LAGraph_Matrix_Print (parent, LAGraph_SHORT, stdout, msg)) ;
 
     //--------------------------------------------------------------------------
     // free everything and finish

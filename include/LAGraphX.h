@@ -868,5 +868,20 @@ int LAGraph_HelloWorld // a simple algorithm, just for illustration
     LAGraph_Graph G,
     char *msg
 ) ;
+//------------------------------------------------------------------------------
+// Multisource BFS
+//------------------------------------------------------------------------------
+
+LAGRAPH_PUBLIC
+int LAGraph_MultiSourceBFS 
+(
+    // outputs:
+    GrB_Matrix    *level,
+    GrB_Matrix    *parent,
+    // inputs:
+    const LAGraph_Graph G,
+    GrB_Vector      src,
+    char          *msg
+) ;
 
 #endif
