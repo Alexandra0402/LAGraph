@@ -35,6 +35,8 @@
     GrB_free (&A) ;                             \
     GrB_free (&parent) ;                        \
     GrB_free (&level) ;                         \
+    GrB_free (&check_parent) ;                        \
+    GrB_free (&check_level) ;                         \
     GrB_free (&SourceNodes) ;                   \
     LAGraph_Delete (&G, msg) ;                  \
     return (info) ;                             \
@@ -55,7 +57,10 @@ int main (int argc, char **argv)
     GrB_Matrix Y = NULL, A = NULL ;
     GrB_Matrix level = NULL ;
     GrB_Matrix parent = NULL ;
+    GrB_Matrix check_level = NULL ;
+    GrB_Matrix check_parent = NULL ;
     GrB_Vector SourceNodes = NULL ;
+    int nSources = 2500;
 
     // start GraphBLAS and LAGraph
     LAGRAPH_TRY (LAGraph_Init (msg)) ;
@@ -79,9 +84,12 @@ int main (int argc, char **argv)
 
     printf ("\n==========================Set up for BFS\n") ;
     // set up
-    GRB_TRY (GrB_Vector_new (&SourceNodes, GrB_INT32, 1)) ;
+    GRB_TRY (GrB_Vector_new (&SourceNodes, GrB_INT32, nSources)) ;
     printf ("\n==========================Intermediate Print\n") ;
-    GRB_TRY (GrB_Vector_setElement (SourceNodes, 0, 0)) ; // currently just uses node 0 of the graph
+    for (int i = 0; i < nSources; i++){
+        GRB_TRY (GrB_Vector_setElement (SourceNodes, i, i)) ; 
+    }
+    
 
     printf ("\n==========================Running BFS\n") ;
     t = LAGraph_WallClockTime ( ) ;
@@ -90,15 +98,31 @@ int main (int argc, char **argv)
     printf ("Time for LAGraph_MultiSourceBFS: %g sec\n", t) ;
 
     //--------------------------------------------------------------------------
-    // check the results (make sure Y is a copy of G->A)
+    // check the results (make sure outputs match)
     //--------------------------------------------------------------------------
-/*
-    bool isequal ;
+
+    bool levelisequal, parentisequal = false;
+    GrB_Index n;
+    GRB_TRY (GrB_Matrix_ncols (&n, level)) ;
+    GrB_Type int_type = (n > INT32_MAX) ? GrB_INT64 : GrB_INT32 ;
+    GRB_TRY (GrB_Matrix_new (&check_level, int_type, nSources, n)) ;
+    GRB_TRY (GrB_Matrix_new (&check_parent, int_type, nSources, n)) ;
     t = LAGraph_WallClockTime ( ) ;
-    LAGRAPH_TRY (LAGraph_Matrix_IsEqual (&isequal, Y, G->A, msg)) ;
+    for (int i = 0; i < nSources; i++) {
+        GrB_Vector tempLevel, tempParent = NULL;
+        GrB_Index src;
+        GRB_TRY (GrB_Vector_extractElement (&src, SourceNodes, i)) ;
+        LAGRAPH_TRY (LAGr_BreadthFirstSearch (&tempLevel,&tempParent, G, src, msg)) ;
+        
+        LAGRAPH_TRY (GxB_subassign(check_level, NULL, NULL, tempLevel, i, GrB_ALL, n, GrB_NULL)) ;
+        LAGRAPH_TRY (GxB_subassign(check_parent, NULL, NULL, tempParent, i, GrB_ALL, n, GrB_NULL)) ;
+    }
+    
     t = LAGraph_WallClockTime ( ) - t ;
-    printf ("Time to check results:       %g sec\n", t) ;
-    if (isequal)
+    printf ("Time to run equivalent regular BFSs:       %g sec\n", t) ;
+    LAGRAPH_TRY (LAGraph_Matrix_IsEqual (&levelisequal, check_level, level, msg)) ;
+    LAGRAPH_TRY (LAGraph_Matrix_IsEqual (&parentisequal, check_parent, parent, msg)) ;
+    if (levelisequal ) // parents can be different in BFS
     {
         printf ("Test passed.\n") ;
     }
@@ -106,9 +130,9 @@ int main (int argc, char **argv)
     {
         printf ("Test failure!\n") ;
     }
-*/
+
     //--------------------------------------------------------------------------
-    // print the results (Y is just a copy of G->A)
+    // print the results 
     //--------------------------------------------------------------------------
 
     printf ("\n===============================The result matrix level:\n") ;

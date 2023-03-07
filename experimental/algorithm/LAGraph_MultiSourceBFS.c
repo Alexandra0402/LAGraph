@@ -51,8 +51,8 @@ int LAGraph_MultiSourceBFS
     LG_CLEAR_MSG ;
     GrB_Matrix q = NULL ;           // the current frontier 
     // GrB_Vector w = NULL ;     to compute work remaining, removed since not doing push-pull
-    GrB_Matrix pi = NULL ;          // parent vector
-    GrB_Matrix v = NULL ;           // level vector
+    GrB_Matrix pi = NULL ;          // parent matrix
+    GrB_Matrix v = NULL ;           // level matrix
 
     bool compute_level  = (level != NULL) ;
     bool compute_parent = (parent != NULL) ;
@@ -70,7 +70,7 @@ int LAGraph_MultiSourceBFS
     GrB_Matrix A = G->A ;
     
     GrB_Index nsrc; // holds the number of source nodes
-    GrB_Index n, nvals ;
+    GrB_Index n;
     GRB_TRY (GrB_Matrix_nrows (&n, A)) ;
     GRB_TRY (GrB_Vector_size (&nsrc, src)) ;
     for (int64_t s = 0; s < nsrc; s++) 
@@ -80,11 +80,9 @@ int LAGraph_MultiSourceBFS
         LG_ASSERT_MSG (currsrc < n, GrB_INVALID_INDEX, "invalid source node") ;
     }
 
-    GRB_TRY (GrB_Matrix_nvals (&nvals, A)) ;
-
     // AT and Degree stuff skipped since we're only doing push
 
-    // determine the semiring type
+    // determine the semiring type 
     GrB_Type int_type = (n > INT32_MAX) ? GrB_INT64 : GrB_INT32 ;
     GrB_Semiring semiring ;
 
@@ -152,7 +150,7 @@ int LAGraph_MultiSourceBFS
         }
     }
 
-    GrB_Index nq = 1 ;      // number of nodes in the current level
+    GrB_Index nq = nsrc ;      // number of nodes in the current level
     // skipping work remaining computation set-up since we're not doing push-pull
 
     //--------------------------------------------------------------------------
@@ -162,7 +160,7 @@ int LAGraph_MultiSourceBFS
     // {!mask} is the set of unvisited nodes
     GrB_Matrix mask = (compute_parent) ? pi : v ;
 
-    for (int64_t nvisited = 1, k = 1 ; nvisited < n ; nvisited += nq, k++)
+    for (int64_t nvisited = nsrc, k = 1 ; nvisited < n*nsrc ; nvisited += nq, k++)
     {
         // skipping push-pull selection
         //----------------------------------------------------------------------
