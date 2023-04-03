@@ -80,7 +80,6 @@ int LAGraph_MultiSourceBFS
         LG_ASSERT_MSG (currsrc < n, GrB_INVALID_INDEX, "invalid source node") ;
     }
 
-    // AT and Degree stuff skipped since we're only doing push
 
     // determine the semiring type 
     GrB_Type int_type = (n > INT32_MAX) ? GrB_INT64 : GrB_INT32 ;
