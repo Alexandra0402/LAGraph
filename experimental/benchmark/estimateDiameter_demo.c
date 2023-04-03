@@ -56,7 +56,7 @@ int main (int argc, char **argv)
     GrB_Index diameter;
     GrB_Vector peripheral = NULL ;
     int numInBatch = 10;
-    int maxLoops = 1000;
+    int maxLoops = 100000;
 
     // start GraphBLAS and LAGraph
     LAGRAPH_TRY (LAGraph_Init (msg)) ;

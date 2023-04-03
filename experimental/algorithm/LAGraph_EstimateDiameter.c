@@ -84,6 +84,7 @@ int LAGraph_EstimateDiameter
 
     // currently just doing the first maxSrcs, consider different randomization
     // check maxSrcs < n
+    // printf("Selecting sources \n");
     if (maxSrcs > n){
         nsrcs = n;
     } else {
@@ -102,13 +103,14 @@ int LAGraph_EstimateDiameter
             GrB_MAX_MONOID_INT64 : GrB_MAX_MONOID_INT32 ;
     bool incSrcs = false;
     for (int64_t i = 0; i < maxLoops; i++){
+        // printf("Start of main loop \n");
         // save previous diameter
         lastd = d;
 
         // get new diameter
         LAGraph_MultiSourceBFS(&level, NULL, G, srcs, msg);
-        GRB_TRY (GrB_Vector_new (&ecc, int_type, nsrcs)) ;
-        GRB_TRY (GrB_reduce(ecc, NULL, NULL, max, level, GrB_NULL)) ;
+        GRB_TRY (GrB_Vector_new (&ecc, int_type, n)) ;
+        GRB_TRY (GrB_reduce(ecc, NULL, NULL, max, level, GrB_DESC_T0T1)) ;
         GRB_TRY (GrB_reduce(&d, NULL, max, ecc, GrB_NULL)) ;
 
         // check if done
@@ -116,6 +118,7 @@ int LAGraph_EstimateDiameter
             incSrcs = true;
             break;
         }
+        // printf("Loop midpoint 1 \n");
 
         // currently brute forcing by looping through, 
         // continue looking for better solution
@@ -123,7 +126,7 @@ int LAGraph_EstimateDiameter
         // set up source list for next round
         // get the number of peripheral nodes 
         int64_t nperi = 0;
-        for (int64_t j = 0; j < nsrcs; j++){
+        for (int64_t j = 0; j < n; j++){
             GrB_Index e;
             GRB_TRY(GrB_Vector_extractElement(&e, ecc, j));
             if (e == d){
@@ -136,11 +139,13 @@ int LAGraph_EstimateDiameter
         } else {
             nsrcs = nperi;
         }
+        // printf("Loop midpoint 2 \n");
+        // printf("Number of peripheral nodes: %d \n",nperi);
         // choose sources
         GrB_free (&srcs) ;
         GRB_TRY (GrB_Vector_new (&srcs, int_type, nsrcs)) ;
         int64_t curri = 0;
-        for (int64_t j = 0; j < nsrcs; j++){
+        for (int64_t j = 0; j < n; j++){
             GrB_Index e;
             GRB_TRY(GrB_Vector_extractElement(&e, ecc, j));
             if (e == d){
@@ -154,6 +159,7 @@ int LAGraph_EstimateDiameter
 
 
     }
+    // printf("Loop complete \n");
 
     //--------------------------------------------------------------------------
     // after loop, set up peripheral nodes if needed
@@ -168,7 +174,7 @@ int LAGraph_EstimateDiameter
             }
         }
        
-        for (int64_t i = 0; i < nsrcs; i++){
+        for (int64_t i = 0; i < n; i++){
             GrB_Index e;
             GRB_TRY(GrB_Vector_extractElement(&e, ecc, i));
             if (e == d){
