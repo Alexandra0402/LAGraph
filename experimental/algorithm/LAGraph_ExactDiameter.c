@@ -14,6 +14,19 @@
 // Takes in a graph and finds the diameter 
 // and optionally also the peripheral nodes of the graph
 
+// Outputs: 
+// Diameter returns the diameter of the graph
+// If not set to NULL, peripheral will be a vector with n elements
+// index i of peripheral is the diameter if it's a peripheral node or nothing if not
+// If not set to NULL, eccentricity will be a vector with the eccentricity of each 
+// node in the graph
+
+// Inputs:
+// G is the graph to be analyzed
+// k is the number of nodes in each batch of the BFS, 
+// higher k value allows for more parallelization at the cost of more space used
+// msg is a buffer for error messages
+
 #define LG_FREE_WORK        \
 {                           \
     GrB_free (&ecc) ;       \
@@ -30,8 +43,9 @@
 int LAGraph_ExactDiameter
 (
     // outputs:
-    GrB_Scalar    *diameter,
+    GrB_Index    *diameter,
     GrB_Vector    *peripheral,
+    GrB_Vector    *eccentricity,
     // inputs:
     const LAGraph_Graph G,
     GrB_Index      k,
@@ -54,8 +68,9 @@ int LAGraph_ExactDiameter
 
     bool compute_periphery  = (peripheral != NULL) ;
     if (compute_periphery ) (*peripheral) = NULL ;
+    bool compute_eccentricity  = (eccentricity != NULL) ;
+    if (compute_eccentricity ) (*eccentricity) = NULL ;
     bool compute_diameter  = (diameter != NULL) ;
-    if (compute_diameter ) (*diameter) = NULL ;
     LG_ASSERT_MSG (compute_diameter, GrB_NULL_POINTER,
         "Diameter destination must be non-NULL") ;
 
@@ -121,17 +136,9 @@ int LAGraph_ExactDiameter
     // get peripheral nodes, if applicable
     //--------------------------------------------------------------------------
 
-    // currently brute forcing by looping through, 
-    // continue looking for better solution 
     if (compute_periphery){
         GRB_TRY (GrB_Vector_new (&peri, int_type, n)) ;
-        for (int64_t i = 0; i < n; i++){
-            GrB_Index e;
-            GRB_TRY(GrB_Vector_extractElement(&e, ecc, i));
-            if (e == d){
-                GRB_TRY (GrB_Vector_setElement (peri, 1, i)) ;
-            }
-        }
+        GRB_TRY (GrB_select(peri, NULL, NULL, GrB_VALUEEQ_T, ecc, d, NULL)) ;
     }
 
     //--------------------------------------------------------------------------
@@ -139,8 +146,11 @@ int LAGraph_ExactDiameter
     //--------------------------------------------------------------------------
 
     if (compute_periphery) (*peripheral) = peri ;
-    GRB_TRY(GrB_Scalar_new(diameter, int_type)) ;
-    GRB_TRY(GrB_Scalar_setElement(*diameter, d)) ;
+    if (compute_eccentricity) {
+        (*eccentricity) = ecc ;
+        ecc = NULL; // makes sure eccentricity vector doesn't get freed if the user wants it
+    } 
+    (*diameter) = d;
     LG_FREE_WORK ;
     return (GrB_SUCCESS) ;
 #endif

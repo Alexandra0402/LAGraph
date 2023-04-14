@@ -14,6 +14,17 @@
 // Takes in a graph and estimates the diameter 
 // and optionally also finds pseudo-peripheral nodes of the graph
 
+// Outputs: 
+// Diameter returns the estimated diameter of the graph
+// If not set to NULL, peripheral will be a vector with n elements
+// index i of peripheral is the estimated diameter if it's a pseudo-peripheral node or nothing if not
+
+// Inputs:
+// G is the graph to be analyzed
+// maxSrcs limits the number of sources used each cycle
+// maxLoops limits the number of times the core loop will run if a stable diameter isn't found
+// msg is a buffer for error messages
+
 #define LG_FREE_WORK        \
 {                           \
     GrB_free (&ecc) ;       \
@@ -107,7 +118,7 @@ int LAGraph_EstimateDiameter
         // save previous diameter
         lastd = d;
 
-        // get new diameter
+        // get new diameter - PUT MSBFS IN TRY
         LAGraph_MultiSourceBFS(&level, NULL, G, srcs, msg);
         GRB_TRY (GrB_Vector_new (&ecc, int_type, n)) ;
         GRB_TRY (GrB_reduce(ecc, NULL, NULL, max, level, GrB_DESC_T0T1)) ;
@@ -174,13 +185,7 @@ int LAGraph_EstimateDiameter
             }
         }
        
-        for (int64_t i = 0; i < n; i++){
-            GrB_Index e;
-            GRB_TRY(GrB_Vector_extractElement(&e, ecc, i));
-            if (e == d){
-                GRB_TRY (GrB_Vector_setElement (peri, 1, i)) ;
-            }
-        }
+        GRB_TRY (GrB_select(peri, NULL, NULL, GrB_VALUEEQ_T, ecc, d, NULL)) ;
 
     }
 
