@@ -177,15 +177,17 @@ int LAGraph_EstimateDiameter
     //--------------------------------------------------------------------------
     if (compute_periphery) {
         GRB_TRY (GrB_Vector_new (&peri, int_type, n)) ;
+
+        GRB_TRY (GrB_select(peri, NULL, NULL, GrB_VALUEEQ_T, ecc, d, NULL)) ;
+
         if (incSrcs) {
             for (int64_t i = 0; i < nsrcs; i++) {
                 GrB_Index currsrc;
                 GRB_TRY(GrB_Vector_extractElement(&currsrc, srcs, i));
-                GRB_TRY (GrB_Vector_setElement (peri, 1, currsrc)) ;  
+                GRB_TRY (GrB_Vector_setElement (peri, d, currsrc)) ;  
             }
         }
        
-        GRB_TRY (GrB_select(peri, NULL, NULL, GrB_VALUEEQ_T, ecc, d, NULL)) ;
 
     }
 
