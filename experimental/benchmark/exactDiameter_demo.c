@@ -35,7 +35,6 @@
 {                                               \
     GrB_free (&Y) ;                             \
     GrB_free (&A) ;                             \
-    GrB_free (&diameter) ;                        \
     GrB_free (&peripheral) ;                         \
     LAGraph_Delete (&G, msg) ;                  \
     return (info) ;                             \
@@ -54,7 +53,7 @@ int main (int argc, char **argv)
     char msg [LAGRAPH_MSG_LEN] ;        // for error messages from LAGraph
     LAGraph_Graph G = NULL ;
     GrB_Matrix Y = NULL, A = NULL ;
-    GrB_Scalar diameter = NULL ;
+    GrB_Index diameter;
     GrB_Vector peripheral = NULL ;
     int numInBatch = 10;
 
@@ -80,7 +79,7 @@ int main (int argc, char **argv)
 
     printf ("\n==========================Running diameter\n") ;
     t = LAGraph_WallClockTime ( ) ;
-    LAGRAPH_TRY (LAGraph_ExactDiameter (&diameter, &peripheral, G, numInBatch, msg)) ;
+    LAGRAPH_TRY (LAGraph_ExactDiameter (&diameter, &peripheral, NULL, G, numInBatch, msg)) ;
     t = LAGraph_WallClockTime ( ) - t ;
     printf ("Time for LAGraph_ExactDiameter: %g sec\n", t) ;
 
@@ -94,8 +93,7 @@ int main (int argc, char **argv)
     // print the results 
     //--------------------------------------------------------------------------
 
-    int d;
-    GRB_TRY(GrB_Scalar_extractElement(&d, diameter)) ;
+    int d = diameter;
     printf ("\n===============================Diameter found: %d \n", d) ;
     printf ("\n===============================The result peripheral vector is:\n") ;
     LAGRAPH_TRY (LAGraph_Vector_Print (peripheral, LAGraph_SHORT, stdout, msg)) ;

@@ -29,12 +29,15 @@
 
 #define LG_FREE_WORK        \
 {                           \
+    GrB_free (&srcEcc) ;    \
     GrB_free (&ecc) ;       \
+    GrB_free (&level) ;       \
 }
 
 #define LG_FREE_ALL         \
 {                           \
     LG_FREE_WORK ;          \
+    GrB_free (eccentricity) ;   \
     GrB_free (&peri) ;      \
 }
 
@@ -64,6 +67,8 @@ int LAGraph_ExactDiameter
     LG_CLEAR_MSG ;
     GrB_Vector ecc = NULL ;           // the eccentricity of the nodes
     GrB_Vector peri = NULL ;          // vector to store peripheral node status in
+    GrB_Vector srcEcc = NULL ;        // work vector to store each iteration's eccentricity in temporarily
+    GrB_Matrix level = NULL;          // work matrix for storing msbfs level info
     GrB_Index d ;                     // diameter
 
     bool compute_periphery  = (peripheral != NULL) ;
@@ -112,14 +117,13 @@ int LAGraph_ExactDiameter
         }
 
         // run bfs to get level matrix for the sources
-        GrB_Matrix level = NULL;
         LAGRAPH_TRY (LAGraph_MultiSourceBFS (&level, NULL, G, srcs, msg)) ;
 
         // populate setStart to setStart+nsrcs of ecc with the max level for each src
-        GrB_Vector srcEcc;
         GRB_TRY (GrB_Vector_new (&srcEcc, int_type, nsrcs)) ;
         GRB_TRY (GrB_reduce(srcEcc, NULL, NULL, max, level, GrB_NULL)) ;
-        LAGRAPH_TRY (GxB_subassign(ecc, NULL, NULL, srcEcc, sources,  nsrcs, GrB_NULL)) ;
+        LAGRAPH_TRY (GrB_assign(ecc, NULL, NULL, srcEcc, sources,  nsrcs, GrB_NULL)) ;
+        GrB_free (&srcEcc) ;
 
         // adjust setStart for next iteration
         setStart = setStart + nsrcs;
@@ -137,8 +141,10 @@ int LAGraph_ExactDiameter
     //--------------------------------------------------------------------------
 
     if (compute_periphery){
+        GrB_IndexUnaryOp eqOp = (n > INT32_MAX) ?
+            GrB_VALUEEQ_INT64 : GrB_VALUEEQ_INT32 ;
         GRB_TRY (GrB_Vector_new (&peri, int_type, n)) ;
-        GRB_TRY (GrB_select(peri, NULL, NULL, GrB_VALUEEQ_T, ecc, d, NULL)) ;
+        GRB_TRY (GrB_select(peri, NULL, NULL, eqOp, ecc, d, NULL)) ;
     }
 
     //--------------------------------------------------------------------------

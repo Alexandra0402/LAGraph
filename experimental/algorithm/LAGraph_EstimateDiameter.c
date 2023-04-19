@@ -28,6 +28,7 @@
 #define LG_FREE_WORK        \
 {                           \
     GrB_free (&ecc) ;       \
+    GrB_free (&candidateSrcs) ;       \
     GrB_free (&srcs) ;      \
     GrB_free (&level) ;     \
 }
@@ -49,6 +50,7 @@ int LAGraph_EstimateDiameter
     const LAGraph_Graph G,
     GrB_Index    maxSrcs,
     GrB_Index    maxLoops,
+    // add seed for randomization
     char          *msg
 )
 {
@@ -69,6 +71,7 @@ int LAGraph_EstimateDiameter
     GrB_Vector srcs = NULL ;        // list of current sources
     GrB_Index nsrcs ;               // number of current sources
     GrB_Matrix level = NULL ;       // matrix for msbfs to put level info in
+    GrB_Vector candidateSrcs = NULL ; // work vector for getting sources for the next iteration of the loop
 
     bool compute_periphery  = (peripheral != NULL) ;
     if (compute_periphery ) (*peripheral) = NULL ;
@@ -112,16 +115,20 @@ int LAGraph_EstimateDiameter
 
     GrB_Monoid max = (n > INT32_MAX) ?
             GrB_MAX_MONOID_INT64 : GrB_MAX_MONOID_INT32 ;
+    GrB_IndexUnaryOp eqOp = (n > INT32_MAX) ?
+            GrB_VALUEEQ_INT64 : GrB_VALUEEQ_INT32 ;
     bool incSrcs = false;
     for (int64_t i = 0; i < maxLoops; i++){
         // printf("Start of main loop \n");
         // save previous diameter
         lastd = d;
 
-        // get new diameter - PUT MSBFS IN TRY
-        LAGraph_MultiSourceBFS(&level, NULL, G, srcs, msg);
+        // get new diameter 
+        LG_TRY (LAGraph_MultiSourceBFS(&level, NULL, G, srcs, msg)) ;
+        // on later iterations, does ecc need to be freed before a new ecc is made?
+        // should this even be in the loop or should it be before the loop and the vector is just overwritten repeatedly?
         GRB_TRY (GrB_Vector_new (&ecc, int_type, n)) ;
-        GRB_TRY (GrB_reduce(ecc, NULL, NULL, max, level, GrB_DESC_T0T1)) ;
+        GRB_TRY (GrB_reduce(ecc, NULL, NULL, max, level, GrB_DESC_T0)) ;
         GRB_TRY (GrB_reduce(&d, NULL, max, ecc, GrB_NULL)) ;
 
         // check if done
@@ -131,42 +138,36 @@ int LAGraph_EstimateDiameter
         }
         // printf("Loop midpoint 1 \n");
 
-        // currently brute forcing by looping through, 
-        // continue looking for better solution
+        // now with fewer for loops
+        // said in last discussion: remaining for loop fine because of batch processing?
 
         // set up source list for next round
         // get the number of peripheral nodes 
         int64_t nperi = 0;
-        for (int64_t j = 0; j < n; j++){
-            GrB_Index e;
-            GRB_TRY(GrB_Vector_extractElement(&e, ecc, j));
-            if (e == d){
-                nperi += 1;
-            }
-        }
+        GRB_TRY (GrB_Vector_new (&candidateSrcs, int_type, n)) ;
+        GRB_TRY (GrB_select(candidateSrcs, NULL, NULL, eqOp, ecc, d, NULL)) ;
+        GRB_TRY (GrB_Vector_nvals(&nperi, candidateSrcs)) ;
+        
+
         // select the number of sources
         if (nperi > maxSrcs) {
             nsrcs = maxSrcs;
         } else {
             nsrcs = nperi;
         }
+
         // printf("Loop midpoint 2 \n");
         // printf("Number of peripheral nodes: %d \n",nperi);
         // choose sources
         GrB_free (&srcs) ;
         GRB_TRY (GrB_Vector_new (&srcs, int_type, nsrcs)) ;
-        int64_t curri = 0;
-        for (int64_t j = 0; j < n; j++){
-            GrB_Index e;
-            GRB_TRY(GrB_Vector_extractElement(&e, ecc, j));
-            if (e == d){
-                GRB_TRY (GrB_Vector_setElement (srcs, j, curri)) ;
-                curri += 1;
-                if (curri == nsrcs) {
-                    break;
-                }
-            }
+        GrB_Index sourceIndecies[nperi];
+        int64_t sourceValues[nperi]; // just need this so extractTuples will run
+        GRB_TRY (GrB_Vector_extractTuples(sourceIndecies, sourceValues, &nperi, candidateSrcs)) ;
+        for (int64_t j = 0; j < nsrcs; j++) {
+            GRB_TRY (GrB_Vector_setElement (srcs, sourceIndecies[j], j)) ;
         }
+        GrB_free(&candidateSrcs) ;
 
 
     }
@@ -178,7 +179,7 @@ int LAGraph_EstimateDiameter
     if (compute_periphery) {
         GRB_TRY (GrB_Vector_new (&peri, int_type, n)) ;
 
-        GRB_TRY (GrB_select(peri, NULL, NULL, GrB_VALUEEQ_T, ecc, d, NULL)) ;
+        GRB_TRY (GrB_select(peri, NULL, NULL, eqOp, ecc, d, NULL)) ;
 
         if (incSrcs) {
             for (int64_t i = 0; i < nsrcs; i++) {
